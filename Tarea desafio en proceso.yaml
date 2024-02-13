@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  InstanceTypeParameter:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m1.small
+      - m1.large
+    Description: Select your Instance. Default is t2.micro
+  Mykeypairtouse:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Selecciones la key con la cual desea configurar la EC2
+  TamañodeDisco:
+    Type: Number
+    AllowedValues:
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+      - 20
+    Description: "Select your volume size in GB between 8 and 20"
+  PuertoMinimoHTTP:
+    Type: Number
+    MinValue: 10
+    MaxValue: 9999
+    Description: "Select your initial range of ports to use"
+  PuertoMaximoHTTP:
+    Type: Number
+    MinValue: 10
+    MaxValue: 9999
+    Description: "Select your final range of ports to use" 
+  EC2zones:
+    Description: Escoge segun tu región la AMI de tu EC2
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+
+Mappings:
+  RegionMap:
+    ap-south-1:
+      ami: ami-065922c1e73497cd6
+    eu-north-1:
+      ami: ami-0f1d2e28425251e77
+    eu-west-3:
+      ami: ami-00af8c914b6e9f965
+    eu-west-2:
+      ami: ami-00abad79ceb567eeb
+    eu-west-1:
+      ami: ami-09894c0159d02a89b
+    ap-northeast-3:
+      ami: ami-06bca2963542669ba
+    ap-northeast-2:
+      ami: ami-0dbdf38ac5fe3dd34
+    ap-northeast-1:
+      ami: ami-0b6b2e3ec60ceba6e
+    ca-central-1:
+      ami: ami-058c6634ce14a46ac
+    sa-east-1:
+      ami: ami-08dd5250a5a98e6cd
+    ap-southeast-1:
+      ami: ami-08d2a78182c75cadd
+    ap-southeast-2:
+      ami: ami-0575a3d1faaf6823d
+    eu-central-1:
+      ami: ami-0f6fc52d4b02c402e
+    us-east-1:
+      ami: ami-05786665f7a430ac5
+    us-east-2:
+      ami: ami-0836e10e20f8145a2
+    us-west-1:
+      ami: ami-04e027a13cad1326c
+    us-west-2:
+      ami: ami-0062269a54fa22b25
+
+Resources:
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: !Sub "${AWS::StackName}-launch-template"
+      LaunchTemplateData:
+        #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-launchtemplate-launchtemplatedata.html#cfn-ec2-launchtemplate-launchtemplatedata-blockdevicemappings 
+        BlockDeviceMappings:
+          #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-launchtemplate-blockdevicemapping.html
+        - DeviceName: /dev/sdh
+          Ebs:
+            #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-launchtemplate-blockdevicemapping-ebs.html
+            DeleteOnTermination: True
+            Encrypted: False
+            VolumeSize: !Ref TamañodeDisco
+            VolumeType: gp3
+        IamInstanceProfile: 
+          Arn: !GetAtt
+            - IamInstanceProfile
+            - Arn
+        ImageId: !Ref EC2zones
+        InstanceType: !Ref InstanceTypeParameter
+				KeyName: !Ref Mykeypairtouse
+        SecurityGroups: 
+        - !Ref InstanceSecurityGroup
+        UserData: 
+          Fn::Base64: 
+            !Sub |
+              #!/bin/bash
+
+              apt update
+              apt install apache2 -y
+              systemctl start apache2
+              systemctl enable apache2
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Join [ -, [ !Sub "${AWS::StackName}", instance, profile ] ]
+      Path: "/"
+      Roles:
+      - !Ref RootRole
+  AutoscalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones: 
+        - us-east-1a
+        - us-east-1b
+        - us-east-1c
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MaxSize: '1'
+      MinSize: '0'
+      DesiredCapacity: '1'
+  RootRole: 
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "ec2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+  RolePolicies: 
+    Type: "AWS::IAM::Policy"
+    Properties: 
+      PolicyName: "root"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Action: "*"
+            Resource: "*"
+      Roles: 
+        - Ref: "RootRole"
