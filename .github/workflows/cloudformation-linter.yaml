@@ -16,5 +16,5 @@ jobs:
       - name: Print the Cloud Formation Linter Version & run Linter.
         run: |
           cfn-lint --version
-          cfn-lint -t /c/Users/admin/Projectos/Repository-Sample-to-learn-Devops/Tarea-desafio-en-proceso.yaml
+          cfn-lint -t ./Tarea-desafio-en-proceso.yaml
 
