@@ -1,0 +1,15 @@
+name: Cloudformation nag
+on: [push]
+#on: 
+#  pull_request:target:
+#    branches:
+#     - main  
+# Este ON se usa cuando necesita allguna acciones muy especifica, como por ejemplo aca
+# que te pide que se activo solo cuado se haga un pullrequest a main.
+jobs:
+    cloudformation-nag:
+
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - run: echo "hola, como estas?"
